@@ -5,6 +5,7 @@ import (
 	"image"
 	"math"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -109,6 +110,28 @@ func impair(clean []int16) []int16 {
 		out[i] = g711.DecodeUlawFrame(g711.EncodeUlawFrame(s))
 	}
 	return out
+}
+
+// TestDroppedAudio covers a PSTN leg that drops runs of RTP packets, each
+// longer than the usual sync search reaches.
+func TestDroppedAudio(t *testing.T) {
+	m := sstvtest.Modes[slices.IndexFunc(sstvtest.Modes, func(m sstvtest.Mode) bool { return m.Name == "PD 50" })]
+	card := m.Card()
+	pcm := m.Encode(card)
+	for _, drop := range []struct{ at, ms int }{{len(pcm) * 7 / 10, 80}, {len(pcm) * 2 / 5, 140}} {
+		pcm = append(pcm[:drop.at], pcm[drop.at+drop.ms*sstv.SampleRate/1000:]...)
+	}
+
+	res, err := sstv.Decode(pcm)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if res.Img.Bounds() != card.Bounds() {
+		t.Fatalf("bounds %v, want %v", res.Img.Bounds(), card.Bounds())
+	}
+	if got := sstvtest.MeanError(card, res.Img); got > 8 {
+		t.Errorf("mean per-channel error %.2f, want <= 8", got)
+	}
 }
 
 func TestPartialDecodesWholeLines(t *testing.T) {

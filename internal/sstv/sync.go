@@ -13,7 +13,9 @@ const (
 // most limit. Each line's sync pulse, syncOff seconds into the line and
 // syncDur long, is located near where the previous lines predict it, so the
 // sender's clock drift and the jumps lost RTP packets cause are followed
-// rather than smeared across the rest of the image. Room echo makes the
+// rather than smeared across the rest of the image. A pulse missing from
+// there is looked for up to half a line earlier, since a PSTN leg can drop
+// runs of packets longer than the window. Room echo makes the
 // track swing sample to sample, so pulses are found on a 1 ms running median.
 func lineStarts(freq []float64, t0, lineDur, syncOff, syncDur float64, limit int) []float64 {
 	hits := make([]int, len(freq)+1)
@@ -25,12 +27,18 @@ func lineStarts(freq []float64, t0, lineDur, syncOff, syncDur float64, limit int
 	}
 	window := int(min(0.050, 0.4*lineDur) * SampleRate)
 	width := int(syncDur * SampleRate)
+	back := int(0.5 * lineDur * SampleRate)
 
 	var starts []float64
 	var shift float64
 	for n := range limit {
 		nominal := t0 + float64(n)*lineDur
-		if p, ok := findSync(hits, int((nominal+shift+syncOff)*SampleRate), window, width); ok {
+		center := int((nominal + shift + syncOff) * SampleRate)
+		p, ok := findSync(hits, center, window, width)
+		if !ok {
+			p, ok = findSync(hits, center-back/2, back/2, width)
+		}
+		if ok {
 			shift = float64(p)/SampleRate - syncOff - nominal
 		}
 		start := nominal + shift
