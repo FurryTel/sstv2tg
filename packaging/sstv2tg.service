@@ -1,0 +1,14 @@
+[Unit]
+Description=SIP SSTV receiver posting to Telegram
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/sstv2tg
+EnvironmentFile=/etc/sstv2tg/env
+DynamicUser=yes
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

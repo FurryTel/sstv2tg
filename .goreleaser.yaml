@@ -1,0 +1,34 @@
+version: 2
+
+builds:
+  - main: ./cmd/sstv2tg
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: [-s -w]
+
+archives:
+  - formats: [binary]
+
+nfpms:
+  - vendor: Pacific Northwest FurryTel
+    maintainer: Pacific Northwest FurryTel
+    description: Answers SIP calls, decodes SSTV, and posts the picture to Telegram.
+    formats: [deb]
+    bindir: /usr/bin
+    contents:
+      - src: packaging/sstv2tg.service
+        dst: /usr/lib/systemd/system/sstv2tg.service
+      - src: packaging/env
+        dst: /etc/sstv2tg/env
+        type: config|noreplace
+        file_info:
+          mode: 0600
+    scripts:
+      postinstall: packaging/postinstall.sh
+      preremove: packaging/preremove.sh
+
+changelog:
+  disable: true
